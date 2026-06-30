@@ -2,7 +2,8 @@
 
 MultiAgentCrossReview의 RuleSync와 함께 쓰는 **private markdown rule vault** 공개 예시입니다.
 
-이 저장소는 MIT 공개 예시/템플릿입니다. 실제 개인 선호, 프로젝트별 비공개 규칙, 로컬 경로가 들어간 파일은 이 저장소가 아니라 사용자가 직접 만든 **private repository**에 보관하세요.
+이 저장소는 MIT 공개 예시/템플릿입니다.  
+실제 개인 선호, 프로젝트별 비공개 규칙, 로컬 경로가 들어간 파일은 이 저장소가 아니라 사용자가 직접 만든 **private repository**에 보관하세요.
 
 ## 역할
 
@@ -12,7 +13,9 @@ MultiAgentCrossReview의 RuleSync와 함께 쓰는 **private markdown rule vault
 | `MultiAgentPrivateRulesSync` | 공개 예시 vault. private rules vault의 디렉터리 형태만 보여줍니다. |
 | 사용자의 private rules vault | 실제 `UserSettings/**/*.md`, 실제 `Projects/<name>/RULES.md`를 보관하는 비공개 SSOT입니다. |
 
-RuleSync는 선택 기능입니다. 한 대의 머신에서만 작업하고 로컬 룰을 직접 관리한다면 private rules vault를 만들 필요가 없습니다. 여러 머신에서 같은 개인 설정과 프로젝트별 룰을 이어 써야 할 때만 이 예시를 복사해 private repository를 구성합니다.
+RuleSync는 선택 기능입니다.  
+한 대의 머신에서만 작업하고 로컬 룰을 직접 관리한다면 private rules vault를 만들 필요가 없습니다.  
+여러 머신에서 같은 개인 설정과 프로젝트별 룰을 이어 써야 할 때만 이 예시를 복사해 private repository를 구성합니다.
 
 ## 구조
 
