@@ -97,20 +97,20 @@ Lower-level copy mode:
 
 ## Example State Layout
 
-See `examples/workbench-state/` for a tiny sanitized state repository shape:
+See `examples/workbench-state/` for a sanitized state repository shape based on the current public/private boundary decision:
 
 ```text
 examples/workbench-state/
   UserSettings/preferences.example.md
-  Projects/ExampleProject/RULES.md
-  Reviews/2026-07-04_ExampleReview/
+  Projects/MultiAgentCrossReview/RULES.md
+  Reviews/2026-07-04_WorkbenchStateBoundary/
     README.md
     Claud/REVIEW.md
     Codex/REVIEW.md
     DECISION.md
 ```
 
-That example shows the kind of data WorkbenchStateSync moves. Real copies of those files belong in your state repository, not in the public framework repository.
+That example shows the kind of data WorkbenchStateSync moves: user settings, project-specific rules, and real review records. Real copies of those files belong in your state repository, not in the public framework repository.
 
 ## Conflict Behavior
 
