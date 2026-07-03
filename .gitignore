@@ -1,14 +1,21 @@
-# Local editor/build noise.
-*.bak-*
-*.log
-*.tmp
+# Local configuration
+/workbenchstatesync.config.psd1
+/WorkbenchStateSync.local.psd1
 
-# Credentials and databases must never live in this vault.
-auth.json
-config.toml
+# Local scratch
+/.claude/
+/.codex/
+/.agents/
+/.vs/
+/Temp/
+*.log
+*.user
+*.bak-*
+
+# Never commit real transport/session data here
+*.jsonl
 *.db
 *.sqlite
-*.sqlite3
 *.key
 *.pem
 *.pfx
