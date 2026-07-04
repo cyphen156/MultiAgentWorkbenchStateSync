@@ -8,7 +8,7 @@
 
   What it does:
     1. Clone the configured state repository to -StateRepoRoot (if missing).
-    2. Write ignored Packages/WorkbenchStateSync/workbenchstatesync.config.psd1 (VaultRoot).
+    2. Write ignored workbenchstatesync.config.psd1 (VaultRoot).
     3. Write ignored Projects/projects.json from projects.example.json
        (only if -SourceRepoRoot and -ProjectName are given).
     4. Run WorkbenchStateSync Start.ps1 (pull state repo -> worktree).

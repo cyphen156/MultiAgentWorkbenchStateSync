@@ -56,8 +56,8 @@ Copy-Item .\workbenchstatesync.config.example.psd1 .\workbenchstatesync.config.p
 
 ```powershell
 @{
-    VaultRoot = 'D:\State\MultiAgentWorkbenchState'
-    WorktreeRoot = 'C:\ClaudCode Project'
+    VaultRoot = 'C:\Path\To\MultiAgentWorkbenchStateVault'
+    WorktreeRoot = 'C:\Path\To\MultiAgentCrossReview'
 }
 ```
 

@@ -35,7 +35,7 @@ $LocalConfig = Import-WorkbenchStateSyncConfig
 if (-not $VaultRoot -and $LocalConfig.ContainsKey('VaultRoot')) { $VaultRoot = [string]$LocalConfig.VaultRoot }
 if (-not $WorktreeRoot -and $LocalConfig.ContainsKey('WorktreeRoot')) { $WorktreeRoot = [string]$LocalConfig.WorktreeRoot }
 if (-not $WorktreeRoot) { $WorktreeRoot = $RepoRoot }
-if (-not $VaultRoot) { throw 'VaultRoot is required. Pass -VaultRoot or create ignored Packages/WorkbenchStateSync/workbenchstatesync.config.psd1 from workbenchstatesync.config.example.psd1.' }
+if (-not $VaultRoot) { throw 'VaultRoot is required. Pass -VaultRoot or create ignored workbenchstatesync.config.psd1 from workbenchstatesync.config.example.psd1.' }
 
 $WorktreeRoot = [IO.Path]::GetFullPath($WorktreeRoot).TrimEnd('\', '/')
 $VaultRoot = [IO.Path]::GetFullPath($VaultRoot).TrimEnd('\', '/')
