@@ -49,7 +49,7 @@ git clone https://github.com/<you>/<your-state-repo>.git D:\State\MultiAgentWork
 예시 config를 복사합니다.
 
 ```powershell
-Copy-Item .\workbenchstatesync.config.example.psd1 .\workbenchstatesync.config.psd1
+Copy-Item .\Launchers\workbenchstatesync.config.example.psd1 .\Launchers\workbenchstatesync.config.psd1
 ```
 
 `workbenchstatesync.config.psd1`을 편집합니다.
@@ -68,31 +68,31 @@ Copy-Item .\workbenchstatesync.config.example.psd1 .\workbenchstatesync.config.p
 상태를 워크벤치로 가져오기(pull):
 
 ```powershell
-.\Start.ps1
+.\Launchers\Start.ps1
 ```
 
 상태를 상태 저장소로 되돌려 보내고 커밋·푸시:
 
 ```powershell
-.\Finish.ps1
+.\Launchers\Finish.ps1
 ```
 
 유용한 변형:
 
 ```powershell
-.\Start.ps1 -DryRun
-.\Finish.ps1 -DryRun
-.\Start.ps1 -Force
-.\Finish.ps1 -NoOverwrite
-.\Finish.ps1 -SkipGitPush
-.\Finish.ps1 -CommitMessage 'workbench state: update desktop'
+.\Launchers\Start.ps1 -DryRun
+.\Launchers\Finish.ps1 -DryRun
+.\Launchers\Start.ps1 -Force
+.\Launchers\Finish.ps1 -NoOverwrite
+.\Launchers\Finish.ps1 -SkipGitPush
+.\Launchers\Finish.ps1 -CommitMessage 'workbench state: update desktop'
 ```
 
 저수준 복사 모드:
 
 ```powershell
-.\workbenchstatesync.ps1 -Direction Pull
-.\workbenchstatesync.ps1 -Direction Push
+.\Launchers\workbenchstatesync.ps1 -Direction Pull
+.\Launchers\workbenchstatesync.ps1 -Direction Push
 ```
 
 ## 예시 상태 레이아웃
