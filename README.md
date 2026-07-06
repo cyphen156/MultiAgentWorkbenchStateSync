@@ -30,6 +30,8 @@ Projects/<name>/edit/**
 
 Codex·Claude 원문 대화(JSONL)는 WorkbenchStateSync 대상이 아닙니다. 그것은 별도의 세션 운반 도구를 씁니다.
 
+포함/제외 규칙 전체는 [`STATE_MANIFEST.schema.md`](STATE_MANIFEST.schema.md)에, 실제 동기화되는 구조의 구체 예시는 [`examples/workbench-state/`](examples/workbench-state/)에 있습니다.
+
 ## 저장소 역할
 
 | 저장소 | 역할 |
