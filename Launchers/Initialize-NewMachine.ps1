@@ -2,8 +2,8 @@
 <#
   Initialize-NewMachine.ps1 - cold bootstrap for a fresh machine.
 
-  Assumes the public MultiAgentCrossReview repo is already cloned and you run this
-  from inside it. Creates the machine-local files that are intentionally NOT synced
+  Assumes the public MultiAgentCrossReview repo is already cloned. Creates the
+  machine-local files that are intentionally NOT synced
   (paths differ per machine), then materializes user-managed workbench state.
 
   What it does:
@@ -13,12 +13,14 @@
        (only if -SourceRepoRoot and -ProjectName are given).
     4. Run WorkbenchStateSync Start.ps1 (pull state repo -> worktree).
     5. Optionally run sync.ps1 to rebuild the baseline mirror (-RunSync).
+    6. Generate machine-local Start / Finish shortcuts.
 
   Session (conversation JSONL) sync is a separate tool: clone your private session
   vault and run its own Initialize-AgentSessionSync.ps1. Not handled here.
 
   Usage:
-    .\Packages\WorkbenchStateSync\Initialize-NewMachine.ps1 `
+    .\Launchers\Initialize-NewMachine.ps1 `
+        -WorkbenchRoot 'C:\Path\To\MultiAgentCrossReview' `
         -StateRepoUrl  'https://github.com/<you>/<state-repo>.git' `
         -StateRepoRoot 'C:\<your>\WorkbenchState' `
         -SourceRepoRoot 'C:\Path\To\YourProject' `
@@ -29,8 +31,9 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)] [string] $StateRepoUrl,
-    [Parameter(Mandatory)] [string] $StateRepoRoot,
+    [Parameter(Mandatory)] [string] $WorkbenchRoot,
+    [string] $StateRepoUrl = '',
+    [string] $StateRepoRoot = '',
     [string] $SourceRepoRoot = '',
     [string] $ProjectName = '',
     [string] $EngineSubdir = '',
@@ -41,7 +44,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $PackageRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$RepoRoot = Split-Path -Parent (Split-Path -Parent $PackageRoot)
+$ToolRoot = Split-Path -Parent $PackageRoot
+$RepoRoot = [IO.Path]::GetFullPath($WorkbenchRoot).TrimEnd('\', '/')
+if (-not $StateRepoRoot) { $StateRepoRoot = $ToolRoot }
+$StateRepoRoot = [IO.Path]::GetFullPath($StateRepoRoot).TrimEnd('\', '/')
 
 function Step([string] $m) { Write-Host "==> $m" -ForegroundColor Cyan }
 function Invoke-Step([string] $desc, [scriptblock] $action) {
@@ -59,6 +65,9 @@ if (Test-Path -LiteralPath $StateRepoRoot) {
     Write-Host "state repo already present, skipping clone: $StateRepoRoot" -ForegroundColor DarkGray
 }
 else {
+    if (-not $StateRepoUrl) {
+        throw 'StateRepoUrl is required when StateRepoRoot does not exist.'
+    }
     Invoke-Step "clone state repo -> $StateRepoRoot" {
         & git clone $StateRepoUrl $StateRepoRoot
         if ($LASTEXITCODE -ne 0) { throw "git clone failed: $StateRepoUrl" }
@@ -106,6 +115,11 @@ if ($RunSync) {
         & (Join-Path $RepoRoot 'sync.ps1')
         if ($LASTEXITCODE -ne 0) { throw "sync.ps1 failed" }
     }
+}
+
+# 6) Generate machine-local shortcuts. They contain absolute paths and are never tracked.
+Invoke-Step 'generate Start / Finish shortcuts' {
+    & (Join-Path $PackageRoot 'Create-Shortcuts.ps1')
 }
 
 Write-Host "New-machine bootstrap complete." -ForegroundColor Green

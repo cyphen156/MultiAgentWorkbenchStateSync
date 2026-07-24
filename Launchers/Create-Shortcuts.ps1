@@ -1,5 +1,5 @@
 #requires -Version 5.1
-# Generate taskbar-pinnable .lnk shortcuts for this tool's commands.
+# Generate machine-local taskbar-pinnable .lnk shortcuts for this tool's commands.
 [CmdletBinding()]
 param([string] $OutputDirectory = '')
 
@@ -14,7 +14,6 @@ $shell = New-Object -ComObject WScript.Shell
 $items = @(
     @{ Name = 'WorkbenchState-Start';   Script = 'Start.ps1';                 Icon = '137'; Desc = 'WorkbenchStateSync: pull state from vault' }
     @{ Name = 'WorkbenchState-Finish';  Script = 'Finish.ps1';                Icon = '131'; Desc = 'WorkbenchStateSync: push state to vault' }
-    @{ Name = 'WorkbenchState-Startup'; Script = 'Initialize-NewMachine.ps1'; Icon = '176'; Desc = 'WorkbenchStateSync: initialize on a new machine' }
 )
 
 foreach ($item in $items) {

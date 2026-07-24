@@ -11,6 +11,7 @@
 *.log
 *.user
 *.bak-*
+/Launchers/Shortcuts/*.lnk
 
 # Never commit real transport/session data here
 *.jsonl
