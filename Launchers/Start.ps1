@@ -3,6 +3,7 @@
 param(
     [string] $VaultRoot = '',
     [string] $WorktreeRoot = '',
+    [string] $BaselineStorePath = '',
     [switch] $Force,
     [switch] $DryRun,
     [switch] $SkipGitPull
@@ -57,7 +58,7 @@ elseif ($DryRun -and -not $SkipGitPull) {
     Write-Host 'dry-run: git pull --ff-only' -ForegroundColor DarkGray
 }
 
-& $WorkbenchStateSyncScript -Direction Pull -VaultRoot $VaultRoot -WorktreeRoot $WorktreeRoot -Force:$Force -DryRun:$DryRun
+& $WorkbenchStateSyncScript -Direction Pull -VaultRoot $VaultRoot -WorktreeRoot $WorktreeRoot -BaselineStorePath $BaselineStorePath -Force:$Force -DryRun:$DryRun
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host 'WorkbenchStateSync Start complete.' -ForegroundColor Green

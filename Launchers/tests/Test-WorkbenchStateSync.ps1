@@ -6,6 +6,8 @@ $script = Resolve-Path (Join-Path $PSScriptRoot '..\workbenchstatesync.ps1')
 $root = Join-Path ([IO.Path]::GetTempPath()) ("WorkbenchStateSync-Test-" + [guid]::NewGuid().ToString('N'))
 $worktree = Join-Path $root 'worktree'
 $vault = Join-Path $root 'vault'
+# 기준점 기록은 머신 로컬이다. 테스트가 실사용 기록을 건드리지 않도록 임시 경로에 가둔다.
+$baselineStore = Join-Path $root 'baseline-store'
 
 try {
     New-Item -ItemType Directory -Force -Path `
@@ -28,7 +30,7 @@ try {
     'template' | Set-Content -LiteralPath (Join-Path $worktree 'Reviews\_TEMPLATE\README.md') -Encoding UTF8
     'tool' | Set-Content -LiteralPath (Join-Path $worktree 'Reviews\run-review.ps1') -Encoding UTF8
 
-    & $script -Direction Push -WorktreeRoot $worktree -VaultRoot $vault
+    & $script -Direction Push -WorktreeRoot $worktree -VaultRoot $vault -BaselineStorePath $baselineStore
     if ($LASTEXITCODE -ne 0) { throw 'Push failed.' }
 
     if (-not (Test-Path (Join-Path $vault 'UserSettings\preferences.md'))) { throw 'UserSettings file was not pushed.' }
@@ -43,20 +45,47 @@ try {
     if (Test-Path (Join-Path $vault 'Reviews\_TEMPLATE\README.md')) { throw 'Review template was pushed.' }
     if (Test-Path (Join-Path $vault 'Reviews\run-review.ps1')) { throw 'Review tool was pushed.' }
 
+    # 한쪽만 앞선 경우는 충돌이 아니다. 기준점이 있으면 -Force 없이도 따라가야 하고,
+    # 백업 파일을 남기지 않아야 한다. 예전에는 해시만 비교해 이 경우도 divergent 로 막았고,
+    # 그래서 뒤처진 쪽이 영원히 갱신되지 않은 채 백업만 쌓였다.
+    'vault moved forward' | Set-Content -LiteralPath (Join-Path $vault 'Projects\Demo\RULES.md') -Encoding UTF8
+    & $script -Direction Pull -WorktreeRoot $worktree -VaultRoot $vault -BaselineStorePath $baselineStore
+    if ($LASTEXITCODE -ne 0) { throw 'Fast-forward pull failed.' }
+    $ff = Get-Content -Raw -LiteralPath (Join-Path $worktree 'Projects\Demo\RULES.md')
+    if ($ff -notmatch 'vault moved forward') { throw 'Fast-forward pull did not update the stale destination.' }
+    if (@(Get-ChildItem -LiteralPath (Join-Path $worktree 'Projects\Demo') -Filter 'RULES.md.bak-*' -File)) {
+        throw 'Fast-forward pull created a backup file.'
+    }
+
+    # 반대 방향. 목적지가 앞서 있고 출발지는 기준점 그대로면 덮어쓰지 않아야 한다.
+    'worktree moved forward' | Set-Content -LiteralPath (Join-Path $worktree 'Projects\Demo\RULES.md') -Encoding UTF8
+    & $script -Direction Pull -WorktreeRoot $worktree -VaultRoot $vault -BaselineStorePath $baselineStore
+    if ($LASTEXITCODE -ne 0) { throw 'Destination-ahead pull failed.' }
+    $ahead = Get-Content -Raw -LiteralPath (Join-Path $worktree 'Projects\Demo\RULES.md')
+    if ($ahead -notmatch 'worktree moved forward') { throw 'Pull overwrote a destination that was ahead.' }
+
     'local changed' | Set-Content -LiteralPath (Join-Path $worktree 'UserSettings\preferences.md') -Encoding UTF8
     'vault changed' | Set-Content -LiteralPath (Join-Path $vault 'UserSettings\preferences.md') -Encoding UTF8
 
-    & $script -Direction Pull -WorktreeRoot $worktree -VaultRoot $vault
+    & $script -Direction Pull -WorktreeRoot $worktree -VaultRoot $vault -BaselineStorePath $baselineStore
     if ($LASTEXITCODE -ne 0) { throw 'Pull failed.' }
     $local = Get-Content -Raw -LiteralPath (Join-Path $worktree 'UserSettings\preferences.md')
     if ($local -notmatch 'local changed') { throw 'Divergent local file was overwritten without -Force.' }
     $backup = Get-ChildItem -LiteralPath (Join-Path $worktree 'UserSettings') -Filter 'preferences.md.bak-*' -File
     if (-not $backup) { throw 'Backup was not created for divergent local file.' }
 
-    & $script -Direction Pull -WorktreeRoot $worktree -VaultRoot $vault -Force
+    & $script -Direction Pull -WorktreeRoot $worktree -VaultRoot $vault -BaselineStorePath $baselineStore -Force
     if ($LASTEXITCODE -ne 0) { throw 'Force pull failed.' }
     $forced = Get-Content -Raw -LiteralPath (Join-Path $worktree 'UserSettings\preferences.md')
     if ($forced -notmatch 'vault changed') { throw 'Force pull did not overwrite destination.' }
+
+    # 백업 파일 자체가 운반되면 안 된다. 예전 차단 패턴 bak-\d+ 는 bak-<날짜>-<시각> 이름을
+    # 걸러내지 못해 백업이 양쪽에 복제됐다.
+    & $script -Direction Push -WorktreeRoot $worktree -VaultRoot $vault -BaselineStorePath $baselineStore
+    if ($LASTEXITCODE -ne 0) { throw 'Backup-exclusion push failed.' }
+    if (@(Get-ChildItem -LiteralPath $vault -Filter '*.bak-*' -File -Recurse)) {
+        throw 'Backup files were transported into the vault.'
+    }
 
     $configWorktree = Join-Path $root 'config-worktree'
     $configVault = Join-Path $root 'config-vault'
@@ -68,7 +97,7 @@ try {
     "@{`n    VaultRoot = '$($configVault.Replace("'", "''"))'`n    WorktreeRoot = '$($configWorktree.Replace("'", "''"))'`n}`n" |
         Set-Content -LiteralPath $configPath -Encoding UTF8
     try {
-        & $script -Direction Push
+        & $script -Direction Push -BaselineStorePath $baselineStore
         if ($LASTEXITCODE -ne 0) { throw 'Config-based push failed.' }
         if (-not (Test-Path (Join-Path $configVault 'UserSettings\preferences.md'))) { throw 'Config-based push did not use local config.' }
     }
@@ -83,7 +112,7 @@ try {
     (('sk-ant-' + 'api03-') + ('a' * 64)) | Set-Content -LiteralPath (Join-Path $secretWorktree 'UserSettings\preferences.md') -Encoding UTF8
     $secretBlocked = $false
     try {
-        & $script -Direction Push -WorktreeRoot $secretWorktree -VaultRoot $secretVault
+        & $script -Direction Push -WorktreeRoot $secretWorktree -VaultRoot $secretVault -BaselineStorePath $baselineStore
     }
     catch {
         $secretBlocked = $true
@@ -113,14 +142,14 @@ try {
 
     New-Item -ItemType Directory -Force -Path (Join-Path $wrapperWorktree 'UserSettings') | Out-Null
     'updated prefs from worktree' | Set-Content -LiteralPath (Join-Path $wrapperWorktree 'UserSettings\preferences.md') -Encoding UTF8
-    & $finishScript -VaultRoot $wrapperVault -WorktreeRoot $wrapperWorktree -CommitMessage 'workbench state test update'
+    & $finishScript -VaultRoot $wrapperVault -WorktreeRoot $wrapperWorktree -BaselineStorePath $baselineStore -CommitMessage 'workbench state test update'
     if ($LASTEXITCODE -ne 0) { throw 'Finish wrapper failed.' }
 
     $wrapperLog = & git -C $wrapperVault log -1 --pretty=%s
     if ($wrapperLog -ne 'workbench state test update') { throw 'Finish wrapper did not commit state update.' }
 
     New-Item -ItemType Directory -Force -Path $wrapperReceiver | Out-Null
-    & $startScript -VaultRoot $wrapperVault -WorktreeRoot $wrapperReceiver
+    & $startScript -VaultRoot $wrapperVault -WorktreeRoot $wrapperReceiver -BaselineStorePath $baselineStore
     if ($LASTEXITCODE -ne 0) { throw 'Start wrapper failed.' }
     $received = Get-Content -Raw -LiteralPath (Join-Path $wrapperReceiver 'UserSettings\preferences.md')
     if ($received -notmatch 'updated prefs from worktree') { throw 'Start wrapper did not materialize pushed state.' }

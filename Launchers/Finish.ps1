@@ -4,6 +4,7 @@ param(
     [string] $VaultRoot = '',
     [string] $WorktreeRoot = '',
     [string] $CommitMessage = 'workbenchstatesync: update state',
+    [string] $BaselineStorePath = '',
     [switch] $Force,
     [switch] $NoOverwrite,
     [switch] $DryRun,
@@ -72,7 +73,8 @@ function Test-BlockedStatePath([string] $RelativePath) {
     if ($norm -match '^Reviews\\_TEMPLATE(\\|$)') { return $true }
     if ($norm -match '(^|\\)baseline(\\|$)') { return $true }
     if ($norm -match '(^|\\)edit(\\|$)') { return $true }
-    if ($norm -match '\.(jsonl|db|sqlite|sqlite3|key|pem|pfx|env|user|log|bak-\d+)$') { return $true }
+    # 백업 이름은 bak-<yyyyMMdd>-<HHmmssfff> 라 숫자 사이에 하이픈이 있다. 'bak-\d+' 로는 안 걸린다.
+    if ($norm -match '\.(jsonl|db|sqlite|sqlite3|key|pem|pfx|env|user|log|bak-[\d-]+)$') { return $true }
     if ($norm -match '(^|\\)(auth\.json|config\.toml|\.git)(\\|$)') { return $true }
     return $false
 }
@@ -124,8 +126,12 @@ elseif ($DryRun -and -not $SkipGitPull) {
     Write-Host 'dry-run: git pull --ff-only' -ForegroundColor DarkGray
 }
 
-$overwrite = (-not $NoOverwrite) -or $Force
-& $WorkbenchStateSyncScript -Direction Push -VaultRoot $VaultRoot -WorktreeRoot $WorktreeRoot -Force:$overwrite -DryRun:$DryRun
+# 예전에는 Push 를 항상 -Force 로 돌렸다. 기준점이 없어 정상적인 로컬 편집조차 충돌로
+# 보였고, 그렇게 하지 않으면 Push 가 아무것도 못 올렸기 때문이다. 대신 반대편이 앞서 있어도
+# 조용히 덮어쓰는 경로가 생겼다. 이제 기준점으로 앞뒤를 구분하므로 -Force 는 사용자가
+# 명시할 때만 건다.
+if ($NoOverwrite) { Write-Warning '-NoOverwrite is now the default; the flag has no effect.' }
+& $WorkbenchStateSyncScript -Direction Push -VaultRoot $VaultRoot -WorktreeRoot $WorktreeRoot -BaselineStorePath $BaselineStorePath -Force:$Force -DryRun:$DryRun
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 if ($DryRun) {

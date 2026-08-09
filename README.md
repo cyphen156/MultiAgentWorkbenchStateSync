@@ -111,7 +111,7 @@ MultiAgentCrossReview의 `Packages/WorkbenchStateSync` 어댑터를 사용하는
 .\Launchers\Start.ps1 -DryRun
 .\Launchers\Finish.ps1 -DryRun
 .\Launchers\Start.ps1 -Force
-.\Launchers\Finish.ps1 -NoOverwrite
+.\Launchers\Finish.ps1 -Force
 .\Launchers\Finish.ps1 -SkipGitPush
 .\Launchers\Finish.ps1 -CommitMessage 'workbench state: update desktop'
 ```
@@ -143,18 +143,27 @@ examples/workbench-state/
 
 ## 충돌 동작
 
-WorkbenchStateSync는 내용이 다른 대상 파일을 조용히 덮어쓰지 않습니다.
+WorkbenchStateSync는 내용이 다른 대상 파일을 조용히 덮어쓰지 않습니다. 다만 "다르다"만으로는
+충돌인지 한쪽이 뒤처진 것인지 알 수 없습니다. 그래서 마지막으로 동기화된 내용의 해시를
+머신 로컬(`%LOCALAPPDATA%\WorkbenchStateSync\`, `-BaselineStorePath`로 변경 가능)에 기준점으로
+기록합니다. 이 기록은 운반 대상이 아닙니다.
 
-소스와 대상이 같은 상대 경로에 서로 다른 내용의 파일을 가질 때:
+| 상황 | 동작 |
+|---|---|
+| 양쪽 내용 동일 | `unchanged`. 그 해시를 새 기준점으로 기록 |
+| 목적지 = 기준점, 출발지만 앞섬 | `fast-forward`. 그대로 갱신하고 백업을 만들지 않음 |
+| 출발지 = 기준점, 목적지가 앞섬 | 덮지 않고 중단. 반대 방향을 먼저 동기화하라고 경고 |
+| 양쪽 다 기준점에서 벗어남 | 진짜 충돌. `.bak-*` 백업 후 `-Force` 없이는 건너뜀 |
+| 기준점 없음(첫 동기화) | Push는 출발지 우선, Pull은 로컬 보호. 어느 쪽이든 백업을 남김 |
 
-1. 대상 파일을 타임스탬프가 붙은 `.bak-*`로 백업합니다.
-2. `-Force`가 없으면 복사를 건너뜁니다.
-3. `-Force`가 있으면 백업 후 소스 파일이 대상을 덮어씁니다.
+기준점이 없던 시절에는 정상적인 로컬 편집도 충돌로 보였기 때문에 `Finish`가 Push를 항상
+`-Force`로 돌렸고, 그 대가로 반대편이 올린 최신본을 조용히 덮어쓰는 경로가 있었습니다.
+이제 `-Force`는 사용자가 명시할 때만 걸립니다.
 
 Push 모드는 흔한 토큰 형태의 시크릿을 스캔합니다. 일치한 값은 출력하지 않습니다.
 
-`.bak-*`는 충돌 증거이지만 동기화·커밋 대상은 아닙니다. 필요 없어진 백업은 사용자가 검토 후
-정리하며, 도구가 자동으로 삭제하지 않습니다.
+`.bak-*`는 충돌 증거이지만 동기화·커밋 대상은 아닙니다. 정식 이력은 상태 저장소의 git
+이력이므로, 필요 없어진 백업은 사용자가 검토 후 정리하며 도구가 자동으로 삭제하지 않습니다.
 
 ## 라이선스
 

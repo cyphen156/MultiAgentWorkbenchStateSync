@@ -7,6 +7,7 @@ param(
 
     [string] $VaultRoot = '',
     [string] $WorktreeRoot = '',
+    [string] $BaselineStorePath = '',
     [switch] $Force,
     [switch] $DryRun
 )
@@ -61,7 +62,10 @@ function Test-BlockedPath([string] $RelativePath) {
     if ($norm -match '^Reviews\\_TEMPLATE(\\|$)') { return $true }
     if ($norm -match '(^|\\)baseline(\\|$)') { return $true }
     if ($norm -match '(^|\\)edit(\\|$)') { return $true }
-    if ($norm -match '\.(jsonl|db|sqlite|sqlite3|key|pem|pfx|env|user|log|bak-\d+)$') { return $true }
+    # 백업 이름은 bak-<yyyyMMdd>-<HHmmssfff> 라서 숫자 사이에 하이픈이 있다. 예전 패턴
+    # 'bak-\d+' 는 그 하이픈에서 끊겨 실제 백업을 하나도 걸러내지 못했고, 그 결과 백업
+    # 파일 자체가 양방향으로 운반돼 양쪽에 쌓였다.
+    if ($norm -match '\.(jsonl|db|sqlite|sqlite3|key|pem|pfx|env|user|log|bak-[\d-]+)$') { return $true }
     if ($norm -match '(^|\\)(auth\.json|config\.toml|\.git)(\\|$)') { return $true }
     return $false
 }
@@ -115,6 +119,46 @@ function Get-FileHashText([string] $Path) {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
 }
 
+function Get-BaselinePath([string] $Vault, [string] $Worktree) {
+    <#
+      마지막으로 동기화된 내용의 해시를 기록해 두는 머신 로컬 파일이다.
+      이것이 없으면 "양쪽이 다르다"는 사실밖에 알 수 없어, 뒤처진 쪽조차 충돌로 취급된다.
+      운반 대상이 아니므로 저장소가 아니라 LOCALAPPDATA 에 둔다.
+    #>
+    $store = $BaselineStorePath
+    if (-not $store) { $store = Join-Path $env:LOCALAPPDATA 'WorkbenchStateSync' }
+    $key = ($Vault + '|' + $Worktree).ToLowerInvariant()
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($key))
+    }
+    finally {
+        $sha.Dispose()
+    }
+    $id = ([BitConverter]::ToString($bytes) -replace '-', '').Substring(0, 16)
+    return (Join-Path $store "baseline-$id.json")
+}
+
+function Import-Baseline([string] $Path) {
+    $map = @{}
+    if (-not (Test-Path -LiteralPath $Path)) { return $map }
+    try {
+        $raw = Get-Content -Raw -LiteralPath $Path -Encoding UTF8 | ConvertFrom-Json
+    }
+    catch {
+        Write-Warning "Baseline record unreadable, starting fresh: $Path"
+        return $map
+    }
+    foreach ($property in $raw.PSObject.Properties) { $map[$property.Name] = [string]$property.Value }
+    return $map
+}
+
+function Export-Baseline([string] $Path, [hashtable] $Map) {
+    $directory = Split-Path -Parent $Path
+    if (-not (Test-Path -LiteralPath $directory)) { New-Item -ItemType Directory -Force -Path $directory | Out-Null }
+    ($Map | ConvertTo-Json -Depth 3) | Set-Content -LiteralPath $Path -Encoding UTF8
+}
+
 function Copy-StateFile([string] $SourceRoot, [string] $DestinationRoot, [IO.FileInfo] $SourceFile) {
     $rel = Get-RelativePath $SourceRoot $SourceFile.FullName
     if (Test-BlockedPath $rel) {
@@ -126,24 +170,61 @@ function Copy-StateFile([string] $SourceRoot, [string] $DestinationRoot, [IO.Fil
     $destinationDir = Split-Path -Parent $destination
     $srcHash = Get-FileHashText $SourceFile.FullName
     $dstHash = Get-FileHashText $destination
+    $baseHash = if ($Baseline.ContainsKey($rel)) { [string]$Baseline[$rel] } else { '' }
 
-    if ($dstHash -and $srcHash -ne $dstHash) {
-        $stamp = Get-Date -Format 'yyyyMMdd-HHmmssfff'
-        $backup = "$destination.bak-$stamp"
-        Write-Warning "Divergent file: $rel"
-        if (-not $DryRun) {
-            New-Item -ItemType Directory -Force -Path $destinationDir | Out-Null
-            Copy-Item -LiteralPath $destination -Destination $backup -Force
-        }
-        Write-Warning "Backup created: $backup"
-        if (-not $Force) {
-            Write-Warning "Skipped without -Force: $rel"
-            return
-        }
-    }
-    elseif ($dstHash -and $srcHash -eq $dstHash) {
+    if ($dstHash -and $srcHash -eq $dstHash) {
+        # 같은 내용이면 그 자체가 새 공통 기준점이다.
+        $script:Baseline[$rel] = $srcHash
         Write-Host "unchanged: $rel" -ForegroundColor DarkGray
         return
+    }
+
+    if ($dstHash) {
+        if ($baseHash -and $dstHash -eq $baseHash) {
+            # 목적지는 마지막 동기화 이후 그대로고 출발지만 앞섰다. 이건 충돌이 아니라
+            # 정상적인 갱신이다. 덮어쓸 내용이 이미 반대편에 있으므로 백업하지 않는다.
+            Write-Host "fast-forward: $rel" -ForegroundColor DarkCyan
+        }
+        elseif ($baseHash -and $srcHash -eq $baseHash) {
+            # 반대. 목적지가 앞서 있고 출발지는 옛날 그대로다. 그대로 덮으면 최신을 잃는다.
+            $other = if ($Direction -eq 'Pull') { 'Push' } else { 'Pull' }
+            Write-Warning "Destination is ahead, source unchanged: $rel"
+            if (-not $Force) {
+                Write-Warning "  Sync the other direction first ($other). Skipped without -Force."
+                return
+            }
+            $stamp = Get-Date -Format 'yyyyMMdd-HHmmssfff'
+            $backup = "$destination.bak-$stamp"
+            if (-not $DryRun) {
+                New-Item -ItemType Directory -Force -Path $destinationDir | Out-Null
+                Copy-Item -LiteralPath $destination -Destination $backup -Force
+            }
+            Write-Warning "Backup created: $backup"
+        }
+        else {
+            # 양쪽 다 기준점에서 벗어났거나(진짜 충돌) 기준점 자체가 없다(첫 동기화).
+            # 기준점이 없을 때만 방향별 기본값을 쓴다. Push 는 "내 작업을 올린다"는 뜻이라
+            # 출발지를 우선하고, Pull 은 받는 쪽이므로 로컬을 지키고 멈춘다. 기준점이 생긴
+            # 뒤에는 이 추정을 쓰지 않는다.
+            $assumeSourceWins = (-not $baseHash) -and ($Direction -eq 'Push')
+            $stamp = Get-Date -Format 'yyyyMMdd-HHmmssfff'
+            $backup = "$destination.bak-$stamp"
+            if ($assumeSourceWins) {
+                Write-Warning "No baseline recorded, assuming the source copy is newer: $rel"
+            }
+            else {
+                Write-Warning "Divergent file: $rel"
+            }
+            if (-not $DryRun) {
+                New-Item -ItemType Directory -Force -Path $destinationDir | Out-Null
+                Copy-Item -LiteralPath $destination -Destination $backup -Force
+            }
+            Write-Warning "Backup created: $backup"
+            if (-not $Force -and -not $assumeSourceWins) {
+                Write-Warning "Skipped without -Force: $rel"
+                return
+            }
+        }
     }
 
     if ($DryRun) {
@@ -153,6 +234,7 @@ function Copy-StateFile([string] $SourceRoot, [string] $DestinationRoot, [IO.Fil
 
     New-Item -ItemType Directory -Force -Path $destinationDir | Out-Null
     Copy-Item -LiteralPath $SourceFile.FullName -Destination $destination -Force
+    $script:Baseline[$rel] = $srcHash
     Write-Host "copied: $rel" -ForegroundColor Green
 }
 
@@ -185,6 +267,9 @@ if (-not $files) {
     return
 }
 
+$BaselinePath = Get-BaselinePath $VaultRoot $WorktreeRoot
+$Baseline = Import-Baseline $BaselinePath
+
 Write-Host "WorkbenchStateSync $Direction" -ForegroundColor Cyan
 Write-Host "  source:      $sourceRoot"
 Write-Host "  destination: $destinationRoot"
@@ -192,6 +277,9 @@ Write-Host "  destination: $destinationRoot"
 foreach ($file in $files) {
     Copy-StateFile $sourceRoot $destinationRoot $file
 }
+
+# DryRun 은 아무것도 옮기지 않았으므로 기준점도 옮기지 않는다.
+if (-not $DryRun) { Export-Baseline $BaselinePath $Baseline }
 
 $global:LASTEXITCODE = 0
 
