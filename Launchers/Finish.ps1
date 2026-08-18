@@ -74,7 +74,7 @@ function Test-BlockedStatePath([string] $RelativePath) {
     if ($norm -match '(^|\\)baseline(\\|$)') { return $true }
     if ($norm -match '(^|\\)edit(\\|$)') { return $true }
     # 백업 이름은 bak-<yyyyMMdd>-<HHmmssfff> 라 숫자 사이에 하이픈이 있다. 'bak-\d+' 로는 안 걸린다.
-    if ($norm -match '\.(jsonl|db|sqlite|sqlite3|key|pem|pfx|env|user|log|bak-[\d-]+)$') { return $true }
+    if ($norm -match '\.(jsonl|db|sqlite|sqlite3|key|pem|pfx|env|user|log|bak-\d{8}-\d{9})$') { return $true }
     if ($norm -match '(^|\\)(auth\.json|config\.toml|\.git)(\\|$)') { return $true }
     return $false
 }

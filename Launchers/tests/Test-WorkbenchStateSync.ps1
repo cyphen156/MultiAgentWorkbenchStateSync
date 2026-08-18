@@ -26,6 +26,7 @@ try {
     'review topic' | Set-Content -LiteralPath (Join-Path $worktree 'Reviews\2026-07-04_Demo\README.md') -Encoding UTF8
     'review body' | Set-Content -LiteralPath (Join-Path $worktree 'Reviews\2026-07-04_Demo\Codex\REVIEW.md') -Encoding UTF8
     'candidate patch' | Set-Content -LiteralPath (Join-Path $worktree 'Reviews\2026-07-04_Demo\Codex\artifacts\candidate.patch') -Encoding UTF8
+    'must stay local' | Set-Content -LiteralPath (Join-Path $worktree 'Reviews\2026-07-04_Demo\Codex\artifacts\candidate.patch.bak-20260818-123456789') -Encoding UTF8
     'public review docs' | Set-Content -LiteralPath (Join-Path $worktree 'Reviews\README.md') -Encoding UTF8
     'template' | Set-Content -LiteralPath (Join-Path $worktree 'Reviews\_TEMPLATE\README.md') -Encoding UTF8
     'tool' | Set-Content -LiteralPath (Join-Path $worktree 'Reviews\run-review.ps1') -Encoding UTF8
@@ -41,6 +42,7 @@ try {
     if (-not (Test-Path (Join-Path $vault 'Reviews\2026-07-04_Demo\README.md'))) { throw 'Review README was not pushed.' }
     if (-not (Test-Path (Join-Path $vault 'Reviews\2026-07-04_Demo\Codex\REVIEW.md'))) { throw 'Review file was not pushed.' }
     if (-not (Test-Path (Join-Path $vault 'Reviews\2026-07-04_Demo\Codex\artifacts\candidate.patch'))) { throw 'Review artifact was not pushed.' }
+    if (Test-Path (Join-Path $vault 'Reviews\2026-07-04_Demo\Codex\artifacts\candidate.patch.bak-20260818-123456789')) { throw 'Timestamped backup was pushed.' }
     if (Test-Path (Join-Path $vault 'Reviews\README.md')) { throw 'Public Reviews README was pushed.' }
     if (Test-Path (Join-Path $vault 'Reviews\_TEMPLATE\README.md')) { throw 'Review template was pushed.' }
     if (Test-Path (Join-Path $vault 'Reviews\run-review.ps1')) { throw 'Review tool was pushed.' }
@@ -66,6 +68,12 @@ try {
 
     'local changed' | Set-Content -LiteralPath (Join-Path $worktree 'UserSettings\preferences.md') -Encoding UTF8
     'vault changed' | Set-Content -LiteralPath (Join-Path $vault 'UserSettings\preferences.md') -Encoding UTF8
+
+    $backupCountBeforeDryRun = @(Get-ChildItem -LiteralPath (Join-Path $worktree 'UserSettings') -Filter 'preferences.md.bak-*' -File).Count
+    $dryRunOutput = (& $script -Direction Pull -WorktreeRoot $worktree -VaultRoot $vault -BaselineStorePath $baselineStore -DryRun *>&1 | Out-String)
+    if ($dryRunOutput -notmatch 'Would create backup:' -or $dryRunOutput -match 'Backup created:') { throw 'DryRun backup message was inaccurate.' }
+    $backupCountAfterDryRun = @(Get-ChildItem -LiteralPath (Join-Path $worktree 'UserSettings') -Filter 'preferences.md.bak-*' -File).Count
+    if ($backupCountAfterDryRun -ne $backupCountBeforeDryRun) { throw 'DryRun created a backup file.' }
 
     & $script -Direction Pull -WorktreeRoot $worktree -VaultRoot $vault -BaselineStorePath $baselineStore
     if ($LASTEXITCODE -ne 0) { throw 'Pull failed.' }

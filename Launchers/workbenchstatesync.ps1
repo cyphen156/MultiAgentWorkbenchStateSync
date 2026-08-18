@@ -65,7 +65,7 @@ function Test-BlockedPath([string] $RelativePath) {
     # 백업 이름은 bak-<yyyyMMdd>-<HHmmssfff> 라서 숫자 사이에 하이픈이 있다. 예전 패턴
     # 'bak-\d+' 는 그 하이픈에서 끊겨 실제 백업을 하나도 걸러내지 못했고, 그 결과 백업
     # 파일 자체가 양방향으로 운반돼 양쪽에 쌓였다.
-    if ($norm -match '\.(jsonl|db|sqlite|sqlite3|key|pem|pfx|env|user|log|bak-[\d-]+)$') { return $true }
+    if ($norm -match '\.(jsonl|db|sqlite|sqlite3|key|pem|pfx|env|user|log|bak-\d{8}-\d{9})$') { return $true }
     if ($norm -match '(^|\\)(auth\.json|config\.toml|\.git)(\\|$)') { return $true }
     return $false
 }
@@ -198,8 +198,11 @@ function Copy-StateFile([string] $SourceRoot, [string] $DestinationRoot, [IO.Fil
             if (-not $DryRun) {
                 New-Item -ItemType Directory -Force -Path $destinationDir | Out-Null
                 Copy-Item -LiteralPath $destination -Destination $backup -Force
+                Write-Warning "Backup created: $backup"
             }
-            Write-Warning "Backup created: $backup"
+            else {
+                Write-Warning "Would create backup: $backup"
+            }
         }
         else {
             # 양쪽 다 기준점에서 벗어났거나(진짜 충돌) 기준점 자체가 없다(첫 동기화).
@@ -218,8 +221,11 @@ function Copy-StateFile([string] $SourceRoot, [string] $DestinationRoot, [IO.Fil
             if (-not $DryRun) {
                 New-Item -ItemType Directory -Force -Path $destinationDir | Out-Null
                 Copy-Item -LiteralPath $destination -Destination $backup -Force
+                Write-Warning "Backup created: $backup"
             }
-            Write-Warning "Backup created: $backup"
+            else {
+                Write-Warning "Would create backup: $backup"
+            }
             if (-not $Force -and -not $assumeSourceWins) {
                 Write-Warning "Skipped without -Force: $rel"
                 return
@@ -282,4 +288,3 @@ foreach ($file in $files) {
 if (-not $DryRun) { Export-Baseline $BaselinePath $Baseline }
 
 $global:LASTEXITCODE = 0
-
