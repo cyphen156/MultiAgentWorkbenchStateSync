@@ -97,9 +97,9 @@ function Get-WorkbenchStateFiles([string] $Root) {
     # Projects/<name>/ 아래에서 운반하는 것은 "프로젝트의 성질"을 적은 파일뿐이다.
     # baseline/ 과 edit/ 는 로컬 사본이라 Test-BlockedPath 가 막는다.
     #   RULES.md    - 프로젝트 규칙
-    #   mirror.json - 미러 스펙. 무엇을 baseline 으로 뜰지는 머신이 아니라 프로젝트의
+    #   MirrorTargets.json - 미러 대상. 무엇을 baseline 으로 뜰지는 머신이 아니라 프로젝트의
     #                 성질이므로, 이것이 운반되지 않으면 머신마다 baseline 범위가 갈린다.
-    $projectStateFiles = @('RULES.md', 'mirror.json')
+    $projectStateFiles = @('RULES.md', 'MirrorTargets.json')
     $projects = Join-Path $Root 'Projects'
     if (Test-Path -LiteralPath $projects) {
         $files += Get-ChildItem -LiteralPath $projects -Directory -ErrorAction SilentlyContinue |
