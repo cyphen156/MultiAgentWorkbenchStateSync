@@ -13,6 +13,7 @@ WorkbenchStateSync는 공개 MultiAgentCrossReview 프레임워크 저장소에 
 ```text
 UserSettings/**/*.md
 Projects/<name>/RULES.md
+Projects/<name>/MirrorTargets.json
 Reviews/<review-id>/**
 ```
 
@@ -38,7 +39,7 @@ Codex·Claude 원문 대화(JSONL)는 WorkbenchStateSync 대상이 아닙니다.
 |---|---|
 | `MultiAgentCrossReview` | 공개 프레임워크: 프로세스 문서, 템플릿, 검토 러너, 예시, 패키지 사본 |
 | `MultiAgentWorkbenchStateSync` | 공개 동기화 도구: 이식 가능한 Start/Finish 래퍼와 복사 규칙 |
-| 사용자 상태 저장소 | 실제 `UserSettings/`, `Projects/<name>/RULES.md`, `Reviews/<review-id>/` 기록을 두는 사용자 지정 저장소(보통 비공개) |
+| 사용자 상태 저장소 | 실제 `UserSettings/`, `Projects/<name>/RULES.md`, `Projects/<name>/MirrorTargets.json`, `Reviews/<review-id>/` 기록을 두는 사용자 지정 저장소(보통 비공개) |
 
 ## 설치
 
